@@ -33,6 +33,7 @@ private const val USER_AGENT = "FOX-Gleis-Light/0.6 (Light Phone III community t
 
 // ---------------------------------------------------------------- Daten fürs Tool
 
+@Serializable
 data class Station(
     val type: String? = null,
     val id: String? = null,
@@ -40,15 +41,18 @@ data class Station(
     val area: String? = null,
 )
 
+@Serializable
 data class Line(
     val name: String? = null,
 )
 
+@Serializable
 data class StopRef(
     val id: String? = null,
     val name: String? = null,
 )
 
+@Serializable
 data class Leg(
     val origin: StopRef? = null,
     val destination: StopRef? = null,
@@ -70,6 +74,7 @@ data class Leg(
     val realTime: Boolean = false,
 )
 
+@Serializable
 data class Journey(
     val legs: List<Leg> = emptyList(),
 )

@@ -1,117 +1,109 @@
 # FOX Gleis Light
-Ich versuche mithilfe von Claude eine Bahn App für Deutschland zu programmieren.
 
-## Ein ruhiges Tool für Bahn, Bus und Tickets auf dem Light Phone III
-Verbindungen suchen und die Fahrkarte aus der Bahn-Mail anzeigen. Kein Konto bei der Bahn,
-keine Werbung, kein Tracking.
+**Gleis** is a calm public-transport tool for the [Light Phone III](https://www.thelightphone.com):
+find a connection in Germany and show your Deutsche Bahn ticket – nothing more.
+No account, no ads, no tracking.
+
+🇩🇪 [Deutsche Version](README.de.md)
 
 <p>
-  <img src="docs/screenshots/start.jpg" width="250" alt="Startseite">
-  <img src="docs/screenshots/verbindungen.jpg" width="250" alt="Verbindungen">
-  <img src="docs/screenshots/fahrkarten.jpg" width="250" alt="Fahrkarten">
+  <img src="docs/screenshots/start.jpg" width="250" alt="Start screen">
+  <img src="docs/screenshots/verbindungen.jpg" width="250" alt="Connections">
+  <img src="docs/screenshots/fahrkarten.jpg" width="250" alt="Tickets">
 </p>
 
-**Was es kann**
+> The app itself is in German, since it is made for travelling in Germany.
 
-- **Verbindungssuche:** Von/Nach eintippen, Bahnhof wählen, optional Tag und Uhrzeit der Abfahrt
-  (Tag aus einer Liste wählen, dann z. B. `17:30` eintippen). Ergebnisse mit Verspätung, Umstiegen und Gleis,
-  Gleiswechsel werden markiert. Die letzte Strecke bleibt gespeichert; „Tauschen“ dreht sie um.
-- **Fahrkarten per Mail:** Das Tool liest eine eigene Ticket-Adresse (nicht dein normales
-  Postfach) und holt per IMAP nur Mails von `bahn.de`, speichert deren
-  PDF-Fahrkarten auf dem Telefon und zeigt den Barcode groß auf weißem Grund. Danach geht
-  das auch offline. Unter einer Verbindung öffnet „Fahrkarte“ direkt das passende Ticket.
+## What it does
 
-**Was es nicht kann**
+- **Journey planner** – From, To, day and time; then *Suchen* (search). Shows departure, arrival,
+  duration, changes, delays and platforms (platform changes are marked). Covers all public
+  transport: trains, long-distance buses, S-/U-Bahn, trams and buses.
+- **Works in dead zones** – the latest results per route are saved on the phone. Without signal,
+  Gleis shows them (with a note that delays are not live).
+- **Tickets from e-mail** – Gleis reads a mailbox you set up *only for train tickets*, picks up
+  mails from Deutsche Bahn (`bahn.de`, `deutschebahn.com`, `bahn.com`, `db.com`, `db.de`, also
+  forwarded ones) and stores the PDF tickets on the phone. Date, time and route are read from the
+  ticket.
+- **Full-screen barcode** – the Aztec code is cut out of the PDF pixel-for-pixel (never re-drawn)
+  and shown black on white across the whole screen. Works offline and has passed a real
+  ticket inspection.
+- **Tidy by itself** – tickets are removed automatically 14 days after the journey. You can also
+  delete them yourself (trash icon, with confirmation). Mails in your mailbox are never touched.
 
-- Tickets kaufen (dafür gibt es keine offene Schnittstelle).
-- Das Deutschlandticket zeigen – dessen Code ist meist dynamisch.
+**What it can't do:** buy tickets (there is no open API for that) or show the Deutschlandticket
+(its code is usually dynamic).
 
-## Datenquellen und Datenschutz
+## Privacy and data
 
-| Was | Wohin | Wozu |
+| What | Sent to | Why |
 |---|---|---|
-| Bahnhofsnamen, Start/Ziel, Zeit | `api.transitous.org` (offener Community-Routenplaner, amtliche Fahrplandaten DELFI) | Fahrplan |
-| Ticket-Adresse + App-Passwort | IMAP-Server des Anbieters, Port 993 (TLS, Hostname geprüft) | Ticket-Mails lesen |
+| Station names, from/to, time | [`api.transitous.org`](https://transitous.org) – open, community-run journey planner using official German timetable data (DELFI) | Timetable |
+| Ticket mailbox address + app password | Your mail provider's IMAP/POP3 server (TLS only, certificate and hostname verified) | Read ticket mails |
 
-- Das Postfach wird nur **lesend** geöffnet (`EXAMINE`, `BODY.PEEK`) – nichts wird als gelesen
-  markiert, verschoben oder gelöscht.
-- Gesucht werden nur Mails von `bahn.de` der letzten 120 Tage im Posteingang.
-- Das App-Passwort liegt mit einem Schlüssel aus dem Android-Keystore verschlüsselt auf dem Gerät.
-  „Vergessen“ in den Einstellungen löscht Zugang und alle gespeicherten Fahrkarten.
+- The mailbox is opened **read-only** (IMAP `EXAMINE` / `BODY.PEEK`, POP3 without `DELE`):
+  nothing is marked as read, moved or deleted.
+- Only mails mentioning a Deutsche Bahn domain from the last 365 days are processed.
+- The app password is encrypted with a key from the Android Keystore.
+- No analytics, no third-party services besides the two above.
 
-## Ticket-Adresse einrichten (einmalig)
+## Set up a ticket mailbox (once)
 
-Das Tool bekommt **nicht** dein normales Postfach, sondern eine eigene Adresse nur für Bahn-Tickets.
+Gleis does **not** get access to your main mailbox – only to an address used for train tickets.
 
-1. Eine neue Mailadresse anlegen, z. B. bei web.de oder GMX (`deinname.tickets@web.de`).
-2. Dort den IMAP-Zugriff einschalten (web.de/GMX: Einstellungen → POP3/IMAP →
-   „POP3 und IMAP Zugriff erlauben“).
-3. Mit Zwei-Faktor-Anmeldung: ein **App-Passwort** anlegen und dieses im Tool eintragen.
-4. Bei bahn.de unter „Mein Konto“ diese Adresse als E-Mail-Adresse hinterlegen.
-   Bei Käufen ohne Konto einfach diese Adresse angeben.
-5. Im Tool: Zahnrad → Adresse und App-Passwort eintragen → „Testen“.
+1. Create a new address, e.g. `yourname.tickets@web.de` (web.de, GMX, Gmail, Posteo, … all work).
+2. Enable IMAP (or POP3) access there. With two-factor login, create an **app password**.
+3. Use this address for your Deutsche Bahn bookings (bahn.de → *Mein Konto*, or when buying
+   without an account). Older tickets can simply be forwarded to it.
+4. In Gleis: ⚙ → enter address and app password → *TESTEN*.
 
-**Server-Einstellungen** (Zahnrad im Tool): Protokoll **IMAP oder POP3**, Server, Port,
-Verschlüsselung (**SSL/TLS oder STARTTLS**) und – bei IMAP – der Ordner. Leer gelassen wird alles
-automatisch gewählt: Für web.de, GMX, Gmail, Posteo, mailbox.org, T-Online und iCloud kennt das Tool
-die Server, sonst versucht es `imap.<domain>` bzw. `pop.<domain>`. SMTP wird nicht gebraucht, das ist
-nur zum Senden. Bei POP3 löscht das Tool nichts; beim Anbieter sollte aber „Mails nach Abruf
-löschen“ ausgeschaltet sein. Unverschlüsselte Verbindungen werden bewusst nicht unterstützt. Beim Öffnen der Ticket-Liste sucht das Tool
-automatisch nach neuen Fahrkarten (höchstens alle 10 Minuten).
+Server, port, protocol (IMAP/POP3), encryption (SSL/TLS or STARTTLS) and folder can be set
+manually; left empty they are chosen automatically. SMTP is not needed.
 
-## APK bauen lassen (ohne eigene Entwicklungsumgebung)
+## Install
 
-1. Kostenloses Konto auf github.com anlegen.
-2. Neues Repository erstellen (z. B. `bahn-light`), dann den Inhalt dieses Ordners hochladen
-   („Add file → Upload files“, alles hineinziehen, „Commit“).
-3. Unter **Actions** startet automatisch „Bahn-APK bauen“ (dauert ca. 5–8 Minuten).
-4. Danach liegt unter **Releases → die neueste Version (z. B. „FOX Gleis Light 0.6.0“)** die Datei `FOX-Gleis-Light.apk`.
+The easiest way is a GitHub-based installer such as **Bright Market** on the Light Phone:
+add `github.com/meisterreineke83/FOX-Gleis-Light`. Every version is published under
+[Releases](https://github.com/meisterreineke83/FOX-Gleis-Light/releases) as `FOX-Gleis-Light.apk`.
 
-Lokal geht es auch mit Android Studio oder:
+Other ways:
+- **Tool Manager (Wi-Fi):** enable developer mode in the [Light dashboard](https://dashboard.thelightphone.com),
+  start the Tool Manager on the phone, upload
+  [`docs/sideloading/light_debug_signing_key.txt`](docs/sideloading/light_debug_signing_key.txt) under
+  *Developer Keys*, then the APK under *Upload Tools*. See [`docs/sideloading`](docs/sideloading/README.md).
+- **adb:** `adb install FOX-Gleis-Light.apk`
+
+The APK is signed with the Light SDK development key; it is not (yet) signed by Light.
+
+## Build
+
+GitHub Actions builds every version automatically (`.github/workflows/build-apk.yml`), the same
+way Light's build server does:
 
 ```
-./gradlew :tool:assembleDebug -DlightSdk.toolOnly=true
+./gradlew :tool:testReleaseUnitTest :tool:assembleRelease -DlightSdk.toolOnly=true -DlightSdk.abiFilters=arm64-v8a
 ```
 
-## Aufs Light Phone bringen
+## Code
 
-**Variante A – Tool Manager über WLAN (ohne Kabel)**
+The tool lives in [`tool/src/main/kotlin/io/github/lightbahn`](tool/src/main/kotlin/io/github/lightbahn):
 
-1. Im [Light-Dashboard](https://dashboard.thelightphone.com) den Entwicklermodus einschalten.
-2. Telefon und Computer ins selbe WLAN, auf dem Telefon in den Einstellungen den Tool Manager
-   starten und die angezeigte Adresse im Browser am Computer öffnen.
-3. Unter `Developer` → `Developer Keys` die Datei
-   [`docs/sideloading/light_debug_signing_key.txt`](docs/sideloading/light_debug_signing_key.txt)
-   hochladen. (Das ist der Fingerabdruck des SDK-Entwicklerschlüssels, mit dem die APK signiert ist.)
-4. Unter `Upload Tools` die `FOX-Gleis-Light.apk` hochladen. Nach kurzer Zeit erscheint „Gleis“ in der Toolbox.
-
-Siehe auch die offizielle Anleitung in [`docs/sideloading`](docs/sideloading/README.md).
-
-**Variante B – per Kabel mit adb**
-
-1. Entwickleroptionen und USB-Debugging am Light Phone aktivieren.
-2. Android platform-tools (adb) am Computer installieren, dann: `adb install FOX-Gleis-Light.apk`
-
-## Aufbau
-
-Der Code des Tools liegt in [`tool/src/main/kotlin/io/github/lightbahn`](tool/src/main/kotlin/io/github/lightbahn):
-
-| Datei | Inhalt |
+| File | Purpose |
 |---|---|
-| `BahnScreen.kt` | Oberfläche mit den Bausteinen der Light SDK |
-| `BahnViewModel.kt` | Zustand, Navigation, Speichern |
-| `BahnApi.kt` | Fahrplan-Abfragen (Transitous) |
-| `ImapClient.kt` | kleiner, nur lesender IMAP-Client (die SDK erlaubt keine Mail-Bibliothek) |
-| `MimeParser.kt` | holt Betreff, Text und PDF-Anhänge aus der Mail |
-| `TicketStore.kt` | lokale Ablage der Tickets, verschlüsseltes Passwort |
-| `TicketRenderer.kt` | rendert das PDF und schneidet den Barcode unverändert aus |
-| `Formatting.kt` | Zeiten, Verspätungen, Eingabe der Abfahrtszeit |
+| `BahnScreen.kt` | UI, built with the Light SDK components |
+| `BahnViewModel.kt` | State and navigation |
+| `BahnApi.kt` | Timetable queries (Transitous) |
+| `JourneyCache.kt` | Saved results for offline use |
+| `MailSettings.kt`, `ImapClient.kt` | Small read-only IMAP/POP3 client (the SDK allows no mail library) |
+| `MimeParser.kt` | Subject, text and PDF attachments from a mail |
+| `PdfText.kt`, `TicketInfo.kt` | Reads date, time and route from the ticket PDF |
+| `TicketStore.kt` | Local ticket storage, cleanup, encrypted password |
+| `TicketRenderer.kt` | Renders the PDF and cuts out the barcode unchanged |
+| `Formatting.kt` | Times, delays, departure input |
 
-Der Rest des Repos ist die [Light SDK](https://github.com/lightphone/light-sdk) (Stand Oktober 2026),
-deren ursprüngliche README in `README.light-sdk.md` liegt.
+Everything else in this repository is the [Light SDK](https://github.com/lightphone/light-sdk)
+(October 2026); its original README is in [`README.light-sdk.md`](README.light-sdk.md).
 
-## Für die offizielle Tool-Bibliothek
+## License
 
-Light verlangt Open Source und prüft u. a. Datenschutz und rechtliche Fragen. Der Zugriff auf ein
-fremdes Postfach und die inoffizielle Fahrplan-API könnten bei der Prüfung Fragen aufwerfen.
-Für den Eigengebrauch per Sideload spielt das keine Rolle.
+MIT – see [LICENSE](LICENSE). Not affiliated with Deutsche Bahn or Light.

@@ -51,7 +51,15 @@ private data class TicketIndex(
     val checkedKeys: List<String> = emptyList(),
     /** Mails, deren Ticket auf dem Telefon gelöscht wurde. Beim Aktualisieren werden sie neu geladen. */
     val deletedKeys: List<String> = emptyList(),
+    /** Mails, deren Fahrt abgelaufen ist (automatisch aufgeräumt). Diese kommen nie zurück. */
+    val expiredKeys: List<String> = emptyList(),
 )
+
+/** So viele Tage nach dem Reisedatum wird ein Ticket automatisch entfernt. */
+internal const val KEEP_DAYS_AFTER_TRAVEL = 14L
+
+internal fun TicketEntry.isExpired(today: java.time.LocalDate = java.time.LocalDate.now(BERLIN)): Boolean =
+    travelDay()?.let { it.plusDays(KEEP_DAYS_AFTER_TRAVEL).isBefore(today) } ?: false
 
 /** Erhöhen, wenn sich das Auslesen von Datum/Bahnhöfen verbessert → alte Tickets werden neu gelesen. */
 private const val INFO_VERSION = 2
@@ -96,6 +104,7 @@ internal class TicketStore(filesDir: File) {
         val index = readIndex()
         val checked = index.checkedKeys.toMutableSet()
         val deleted = index.deletedKeys.toMutableSet()
+        val expired = index.expiredKeys.toMutableSet()
         var checkedCount = 0
         var bahnMails = 0
         var withoutPdf = 0
@@ -112,6 +121,7 @@ internal class TicketStore(filesDir: File) {
                 deleted.retainAll(present)
             }
             val keys = candidates
+                .filter { it !in expired }
                 .filter { it !in checked || (restoreDeleted && it in deleted) }
                 .take(40)
                 .reversed() // älteste zuerst, damit neuere Mails die höheren Nummern bekommen
@@ -142,7 +152,7 @@ internal class TicketStore(filesDir: File) {
                     File(dir, name).writeBytes(bytes)
                     name
                 }
-                tickets += withInfo(
+                val entry = withInfo(
                     TicketEntry(
                         uid = id,
                         subject = mail.subject.ifBlank { "Fahrkarte" },
@@ -152,12 +162,20 @@ internal class TicketStore(filesDir: File) {
                         key = key,
                     ),
                 )
+                if (entry.isExpired()) {
+                    // Alte Fahrt: gar nicht erst in die Liste aufnehmen.
+                    removeFiles(entry)
+                    expired += key
+                    deleted -= key
+                    continue
+                }
+                tickets += entry
                 added++
             }
             reader.quit()
         }
 
-        writeIndex(TicketIndex(tickets, checked.toList(), deleted.toList()))
+        writeIndex(TicketIndex(tickets, checked.toList(), deleted.toList(), expired.toList()))
         return RefreshResult(checkedCount, bahnMails, withoutPdf, added)
     }
 
@@ -203,13 +221,39 @@ internal class TicketStore(filesDir: File) {
         }
     }
 
+    /**
+     * Entfernt Tickets, deren Reisedatum mehr als [KEEP_DAYS_AFTER_TRAVEL] Tage zurückliegt.
+     * Tickets ohne erkanntes Reisedatum bleiben stehen.
+     * @return Anzahl entfernter Tickets
+     */
     @Synchronized
-    fun delete(entry: TicketEntry) {
+    fun removeExpired(): Int {
+        val index = readIndex()
+        val (old, keep) = index.tickets.partition { it.isExpired() }
+        if (old.isEmpty()) return 0
+        old.forEach(::removeFiles)
+        val oldKeys = old.mapNotNull { it.key }
+        writeIndex(
+            index.copy(
+                tickets = keep,
+                deletedKeys = index.deletedKeys - oldKeys.toSet(),
+                expiredKeys = (index.expiredKeys + oldKeys).distinct(),
+            ),
+        )
+        return old.size
+    }
+
+    private fun removeFiles(entry: TicketEntry) {
         entry.files.forEach {
             File(dir, it).delete()
             File(dir, "$it.code.png").delete()
             File(dir, "$it.code2.png").delete()
         }
+    }
+
+    @Synchronized
+    fun delete(entry: TicketEntry) {
+        removeFiles(entry)
         val index = readIndex()
         writeIndex(
             index.copy(

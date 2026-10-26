@@ -32,8 +32,12 @@ jobs:
       - name: APK bauen
         run: |
           chmod +x gradlew
-          ./gradlew :tool:assembleDebug -DlightSdk.toolOnly=true --stacktrace
-          cp tool/build/outputs/apk/debug/*.apk FOX-Gleis-Light.apk
+          # Wie Lights eigener Build-Server: Release mit Code-Verkleinerung, nur arm64 (Light Phone III).
+          # Signiert mit dem SDK-Entwicklerschlüssel – derselbe wie bisher, Updates klappen also.
+          ./gradlew :tool:testReleaseUnitTest :tool:assembleRelease \
+            -DlightSdk.toolOnly=true -DlightSdk.abiFilters=arm64-v8a --stacktrace
+          cp tool/build/outputs/apk/release/*.apk FOX-Gleis-Light.apk
+          ls -la FOX-Gleis-Light.apk
 
       - uses: actions/upload-artifact@v4
         with:

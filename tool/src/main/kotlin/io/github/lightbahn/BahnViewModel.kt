@@ -81,6 +81,7 @@ class BahnViewModel internal constructor(
 
     private val api = BahnApi()
     private val ticketStore = TicketStore(filesDir)
+    private val journeyCache = JourneyCache(filesDir)
 
     private val _state = MutableStateFlow(BahnUiState())
     val state: StateFlow<BahnUiState> = _state
@@ -111,7 +112,9 @@ class BahnViewModel internal constructor(
             }
             // Tickets aus älteren Versionen: Datum und Bahnhöfe einmalig aus dem PDF nachlesen.
             val changed = withContext(Dispatchers.Default) { runCatching { ticketStore.fillMissingInfo() }.getOrDefault(false) }
-            if (changed) {
+            // Fahrten, die mehr als 14 Tage zurückliegen, automatisch entfernen.
+            val removed = withContext(Dispatchers.IO) { runCatching { ticketStore.removeExpired() }.getOrDefault(0) }
+            if (changed || removed > 0) {
                 val refreshed = withContext(Dispatchers.IO) { ticketStore.tickets() }
                 _state.update { it.copy(tickets = refreshed) }
             }
@@ -288,19 +291,34 @@ class BahnViewModel internal constructor(
             return
         }
         _state.update { it.copy(busy = "Suche Verbindungen …") }
+        val departure = s.departure?.toOffsetDateTime()
         viewModelScope.launch {
             try {
-                val page = withContext(Dispatchers.IO) {
-                    api.searchJourneys(from, to, s.departure?.toOffsetDateTime())
-                }
+                val page = withContext(Dispatchers.IO) { api.searchJourneys(from, to, departure) }
                 _state.update { it.copy(busy = null, journeys = page.journeys, laterRef = page.laterRef) }
                 if (page.journeys.isEmpty()) {
                     _state.update { it.copy(message = "Keine Verbindungen gefunden.") }
                 } else {
+                    // Für unterwegs ohne Netz merken.
+                    withContext(Dispatchers.IO) { runCatching { journeyCache.save(from, to, departure, page.journeys) } }
                     push(Mode.Results)
                 }
             } catch (e: Exception) {
-                fail(e)
+                // Kein Netz oder Dienst gestört: gespeicherte Verbindungen dieser Strecke zeigen, falls vorhanden.
+                val saved = withContext(Dispatchers.IO) { runCatching { journeyCache.find(from, to, departure) }.getOrNull() }
+                if (saved == null) {
+                    fail(e)
+                } else {
+                    val when_ = runCatching {
+                        java.time.OffsetDateTime.parse(saved.savedAt).atZoneSameInstant(BERLIN)
+                            .format(java.time.format.DateTimeFormatter.ofPattern("dd.MM. 'um' HH:mm"))
+                    }.getOrDefault("")
+                    _state.update { it.copy(busy = null, journeys = saved.journeys, laterRef = null) }
+                    push(Mode.Results)
+                    _state.update {
+                        it.copy(message = "Ohne Netz – gespeicherte Verbindungen vom $when_. Verspätungen sind nicht aktuell.")
+                    }
+                }
             }
         }
     }
@@ -315,6 +333,7 @@ class BahnViewModel internal constructor(
         viewModelScope.launch {
             try {
                 val page = withContext(Dispatchers.IO) { api.searchJourneys(from, to, null, ref) }
+                withContext(Dispatchers.IO) { runCatching { journeyCache.append(from, to, page.journeys) } }
                 _state.update {
                     it.copy(loadingMore = false, journeys = it.journeys + page.journeys, laterRef = page.laterRef)
                 }
