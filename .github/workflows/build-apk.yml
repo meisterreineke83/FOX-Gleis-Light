@@ -39,6 +39,13 @@ jobs:
           cp tool/build/outputs/apk/release/*.apk FOX-Gleis-Light.apk
           ls -la FOX-Gleis-Light.apk
 
+      - name: Release-Text
+        run: |
+          notes="docs/release-notes/${{ steps.v.outputs.version }}.md"
+          if [ -f "$notes" ]; then cp "$notes" release-body.md; else
+            printf 'Automatisch gebaut aus %s.\n\nInstallation: siehe README.\n' "${{ github.sha }}" > release-body.md
+          fi
+
       - uses: actions/upload-artifact@v4
         with:
           name: FOX-Gleis-Light-APK
@@ -52,6 +59,4 @@ jobs:
           prerelease: false
           make_latest: true
           files: FOX-Gleis-Light.apk
-          body: |
-            Automatisch gebaut aus ${{ github.sha }}.
-            Installation: siehe README → „Aufs Light Phone bringen“.
+          body_path: release-body.md
