@@ -56,6 +56,8 @@ private object Keys {
     val FROM_NAME = stringPreferencesKey("from_name_v2")
     val TO_ID = stringPreferencesKey("to_id_v2")
     val TO_NAME = stringPreferencesKey("to_name_v2")
+    val FROM_COORDS = stringPreferencesKey("from_coords")
+    val TO_COORDS = stringPreferencesKey("to_coords")
     val EMAIL = stringPreferencesKey("imap_email")
     val PASSWORD = stringPreferencesKey("imap_password_enc")
     val PROTOCOL = stringPreferencesKey("mail_protocol")
@@ -98,8 +100,8 @@ class BahnViewModel internal constructor(
         loaded = true
         viewModelScope.launch {
             val prefs = dataStore.data.first()
-            val from = station(prefs[Keys.FROM_ID], prefs[Keys.FROM_NAME])
-            val to = station(prefs[Keys.TO_ID], prefs[Keys.TO_NAME])
+            val from = station(prefs[Keys.FROM_ID], prefs[Keys.FROM_NAME], prefs[Keys.FROM_COORDS])
+            val to = station(prefs[Keys.TO_ID], prefs[Keys.TO_NAME], prefs[Keys.TO_COORDS])
             val tickets = withContext(Dispatchers.IO) { ticketStore.tickets() }
             _state.update {
                 it.copy(
@@ -121,8 +123,15 @@ class BahnViewModel internal constructor(
         }
     }
 
-    private fun station(id: String?, name: String?) =
-        if (id.isNullOrBlank() || name.isNullOrBlank()) null else Station("station", id, name)
+    private fun station(id: String?, name: String?, coords: String?): Station? {
+        if (id.isNullOrBlank() || name.isNullOrBlank()) return null
+        val (lat, lon) = coords?.split(',')?.mapNotNull { it.toDoubleOrNull() }?.takeIf { it.size == 2 }
+            ?.let { it[0] to it[1] } ?: (null to null)
+        // Ältere Versionen haben teils Gruppen-Kennungen ("…_G") gespeichert, die die Suche nicht kennt.
+        return Station("station", stopId(id), name, lat = lat, lon = lon)
+    }
+
+    private fun Station.coordsText(): String? = if (lat != null && lon != null) "$lat,$lon" else null
 
     // ---------- Navigation ----------
 
@@ -274,8 +283,14 @@ class BahnViewModel internal constructor(
         val s = _state.value
         viewModelScope.launch {
             dataStore.edit { prefs ->
-                s.from?.let { prefs[Keys.FROM_ID] = it.id.orEmpty(); prefs[Keys.FROM_NAME] = it.name.orEmpty() }
-                s.to?.let { prefs[Keys.TO_ID] = it.id.orEmpty(); prefs[Keys.TO_NAME] = it.name.orEmpty() }
+                s.from?.let {
+                    prefs[Keys.FROM_ID] = it.id.orEmpty(); prefs[Keys.FROM_NAME] = it.name.orEmpty()
+                    it.coordsText()?.let { c -> prefs[Keys.FROM_COORDS] = c } ?: prefs.remove(Keys.FROM_COORDS)
+                }
+                s.to?.let {
+                    prefs[Keys.TO_ID] = it.id.orEmpty(); prefs[Keys.TO_NAME] = it.name.orEmpty()
+                    it.coordsText()?.let { c -> prefs[Keys.TO_COORDS] = c } ?: prefs.remove(Keys.TO_COORDS)
+                }
             }
         }
     }
@@ -284,9 +299,11 @@ class BahnViewModel internal constructor(
 
     fun search() {
         val s = _state.value
-        val from = s.from?.id
-        val to = s.to?.id
-        if (from == null || to == null) {
+        val fromStation = s.from
+        val toStation = s.to
+        val from = fromStation?.id
+        val to = toStation?.id
+        if (fromStation == null || toStation == null || from == null || to == null) {
             _state.update { it.copy(message = "Bitte Start und Ziel wählen.") }
             return
         }
@@ -294,7 +311,7 @@ class BahnViewModel internal constructor(
         val departure = s.departure?.toOffsetDateTime()
         viewModelScope.launch {
             try {
-                val page = withContext(Dispatchers.IO) { api.searchJourneys(from, to, departure) }
+                val page = withContext(Dispatchers.IO) { api.searchJourneys(fromStation, toStation, departure) }
                 _state.update { it.copy(busy = null, journeys = page.journeys, laterRef = page.laterRef) }
                 if (page.journeys.isEmpty()) {
                     _state.update { it.copy(message = "Keine Verbindungen gefunden.") }
@@ -305,7 +322,10 @@ class BahnViewModel internal constructor(
                 }
             } catch (e: Exception) {
                 // Kein Netz oder Dienst gestört: gespeicherte Verbindungen dieser Strecke zeigen, falls vorhanden.
-                val saved = withContext(Dispatchers.IO) { runCatching { journeyCache.find(from, to, departure) }.getOrNull() }
+                // (Nicht bei Fehlern wie "Bahnhof unbekannt" – die würden gespeicherte Daten nur verdecken.)
+                val offline = e !is ApiException || e.status >= 500
+                val saved = if (!offline) null else
+                    withContext(Dispatchers.IO) { runCatching { journeyCache.find(from, to, departure) }.getOrNull() }
                 if (saved == null) {
                     fail(e)
                 } else {
@@ -326,13 +346,15 @@ class BahnViewModel internal constructor(
     fun loadLater() {
         val s = _state.value
         val ref = s.laterRef ?: return
-        val from = s.from?.id ?: return
-        val to = s.to?.id ?: return
+        val fromStation = s.from ?: return
+        val toStation = s.to ?: return
+        val from = fromStation.id ?: return
+        val to = toStation.id ?: return
         if (s.loadingMore) return
         _state.update { it.copy(loadingMore = true) }
         viewModelScope.launch {
             try {
-                val page = withContext(Dispatchers.IO) { api.searchJourneys(from, to, null, ref) }
+                val page = withContext(Dispatchers.IO) { api.searchJourneys(fromStation, toStation, null, ref) }
                 withContext(Dispatchers.IO) { runCatching { journeyCache.append(from, to, page.journeys) } }
                 _state.update {
                     it.copy(loadingMore = false, journeys = it.journeys + page.journeys, laterRef = page.laterRef)

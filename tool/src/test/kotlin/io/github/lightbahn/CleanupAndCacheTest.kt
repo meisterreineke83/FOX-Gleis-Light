@@ -69,3 +69,11 @@ class CleanupAndCacheTest {
         assertEquals(listOf(first, second), cache.find("a", "b", tomorrow)?.journeys)
     }
 }
+
+class StopIdTest {
+    @Test
+    fun `group ids lose their _G suffix`() {
+        assertEquals("de-DELFI_de:08336:6578", stopId("de-DELFI_de:08336:6578_G"))
+        assertEquals("de-DELFI_ch:23005:6", stopId("de-DELFI_ch:23005:6"))
+    }
+}
