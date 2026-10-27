@@ -1,0 +1,25 @@
+name: API-Test (temporär)
+on:
+  push:
+    branches: [api-test]
+jobs:
+  t:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          note() { echo "::notice title=$1::$(echo "$2" | head -c 3000 | tr '\n' ' ')"; }
+          UA="FOX-Gleis-Light test"
+          G=https://api.transitous.org/api/v1/geocode; P=https://api.transitous.org/api/v5/plan
+          note geo-basel "$(curl -sS -G -A "$UA" $G --data-urlencode 'text=Basel Bad Bf' --data-urlencode type=STOP --data-urlencode language=de | jq -c '[.[]|{name,id,lat,lon}][0:5]')"
+          note geo-rhf "$(curl -sS -G -A "$UA" $G --data-urlencode 'text=Rheinfelden (Baden)' --data-urlencode type=STOP --data-urlencode language=de | jq -c '[.[]|{name,id,lat,lon}][0:5]')"
+          plan() { curl -sS -G -A "$UA" $P --data-urlencode "fromPlace=$1" --data-urlencode "toPlace=$2" --data-urlencode numItineraries=2 -w ' HTTP=%{http_code}' -o p.json > c.txt; echo "$(cat c.txt) $(jq -c '[.itineraries[]? | [.legs[] | {mode, from: .from.name, to: .to.name, s: .startTime}]][0]' p.json 2>/dev/null) $(jq -c '.error?' p.json 2>/dev/null)"; }
+          BID=$(curl -sS -G -A "$UA" $G --data-urlencode 'text=Basel Bad Bf' --data-urlencode type=STOP | jq -r '.[0].id')
+          BLL=$(curl -sS -G -A "$UA" $G --data-urlencode 'text=Basel Bad Bf' --data-urlencode type=STOP | jq -r '"\(.[0].lat),\(.[0].lon)"')
+          RID=$(curl -sS -G -A "$UA" $G --data-urlencode 'text=Rheinfelden (Baden)' --data-urlencode type=STOP | jq -r '.[0].id')
+          RLL=$(curl -sS -G -A "$UA" $G --data-urlencode 'text=Rheinfelden (Baden)' --data-urlencode type=STOP | jq -r '"\(.[0].lat),\(.[0].lon)"')
+          note ids "$BID $BLL | $RID $RLL"
+          note plan-ids "$(plan "$BID" "$RID")"
+          note plan-coords "$(plan "$BLL" "$RLL")"
+          note plan-mixed "$(plan "$BID" "$RLL")"
+          note plan-oldid "$(plan 'de-DELFI_de:08336:6578_G' "$RID")"
+          note plan-stripped "$(plan 'de-DELFI_de:08336:6578' "$RID")"
