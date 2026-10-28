@@ -1,3 +1,5 @@
+<img src="docs/icon.png" width="120" alt="Gleis icon" align="right">
+
 # FOX Gleis Light
 
 **Gleis** is a calm public-transport tool for the [Light Phone III](https://www.thelightphone.com):

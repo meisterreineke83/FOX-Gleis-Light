@@ -1,3 +1,5 @@
+<img src="docs/icon.png" width="120" alt="Gleis-Symbol" align="right">
+
 # FOX Gleis Light
 
 **Gleis** ist ein ruhiges Tool für Bahn und Bus auf dem [Light Phone III](https://www.thelightphone.com):
