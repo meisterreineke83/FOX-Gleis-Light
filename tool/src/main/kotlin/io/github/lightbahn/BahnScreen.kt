@@ -214,19 +214,34 @@ class BahnScreen(sealedActivity: SealedLightActivity) :
             message = state.message,
             scroll = false,
         ) {
-            LightTextField(
-                label = "Von",
-                value = state.from?.name.orEmpty(),
-                placeholder = "Start wählen",
-                onClick = { viewModel.edit(Field.FROM) },
-            )
-            LightTextField(
-                label = "Nach",
-                value = state.to?.name.orEmpty(),
-                placeholder = "Ziel wählen",
-                onClick = { viewModel.edit(Field.TO) },
-                modifier = Modifier.padding(top = 1.5f.gridUnitsAsDp()),
-            )
+            // Von und Nach, rechts daneben der Pfeil zum Tauschen von Start und Ziel.
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    LightTextField(
+                        label = "Von",
+                        value = state.from?.name.orEmpty(),
+                        placeholder = "Start wählen",
+                        onClick = { viewModel.edit(Field.FROM) },
+                    )
+                    LightTextField(
+                        label = "Nach",
+                        value = state.to?.name.orEmpty(),
+                        placeholder = "Ziel wählen",
+                        onClick = { viewModel.edit(Field.TO) },
+                        modifier = Modifier.padding(top = 1.5f.gridUnitsAsDp()),
+                    )
+                }
+                LightIcon(
+                    icon = LightIcons.REVERSE_ORDER,
+                    contentDescription = "Start und Ziel tauschen",
+                    modifier = Modifier
+                        .lightClickable(enabled = state.from != null || state.to != null) { viewModel.swap() }
+                        .padding(start = 1.5f.gridUnitsAsDp(), top = 2f.gridUnitsAsDp(), bottom = 2f.gridUnitsAsDp()),
+                )
+            }
             LightTextField(
                 label = "Abfahrt",
                 value = describeDeparture(state.departure),
