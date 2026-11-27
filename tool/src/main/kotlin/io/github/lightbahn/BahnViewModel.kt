@@ -41,7 +41,9 @@ data class BahnUiState(
     val departure: ZonedDateTime? = null,
     val journeys: List<Journey> = emptyList(),
     val laterRef: String? = null,
+    val earlierRef: String? = null,
     val loadingMore: Boolean = false,
+    val loadingEarlier: Boolean = false,
     val tickets: List<TicketEntry> = emptyList(),
     val mail: MailSettings = MailSettings(),
     val hasPassword: Boolean = false,
@@ -158,7 +160,7 @@ class BahnViewModel internal constructor(
     fun clearMessage() = _state.update { it.copy(message = null) }
 
     private fun fail(e: Throwable) {
-        _state.update { it.copy(busy = null, loadingMore = false, message = e.message ?: "Unbekannter Fehler") }
+        _state.update { it.copy(busy = null, loadingMore = false, loadingEarlier = false, message = e.message ?: "Unbekannter Fehler") }
     }
 
     // ---------- Eingabe ----------
@@ -312,7 +314,9 @@ class BahnViewModel internal constructor(
         viewModelScope.launch {
             try {
                 val page = withContext(Dispatchers.IO) { api.searchJourneys(fromStation, toStation, departure) }
-                _state.update { it.copy(busy = null, journeys = page.journeys, laterRef = page.laterRef) }
+                _state.update {
+                    it.copy(busy = null, journeys = page.journeys, laterRef = page.laterRef, earlierRef = page.earlierRef)
+                }
                 if (page.journeys.isEmpty()) {
                     _state.update { it.copy(message = "Keine Verbindungen gefunden.") }
                 } else {
@@ -333,7 +337,7 @@ class BahnViewModel internal constructor(
                         java.time.OffsetDateTime.parse(saved.savedAt).atZoneSameInstant(BERLIN)
                             .format(java.time.format.DateTimeFormatter.ofPattern("dd.MM. 'um' HH:mm"))
                     }.getOrDefault("")
-                    _state.update { it.copy(busy = null, journeys = saved.journeys, laterRef = null) }
+                    _state.update { it.copy(busy = null, journeys = saved.journeys, laterRef = null, earlierRef = null) }
                     push(Mode.Results)
                     _state.update {
                         it.copy(message = "Ohne Netz – gespeicherte Verbindungen vom $when_. Verspätungen sind nicht aktuell.")
@@ -358,6 +362,34 @@ class BahnViewModel internal constructor(
                 withContext(Dispatchers.IO) { runCatching { journeyCache.append(from, to, page.journeys) } }
                 _state.update {
                     it.copy(loadingMore = false, journeys = it.journeys + page.journeys, laterRef = page.laterRef)
+                }
+            } catch (e: Exception) {
+                fail(e)
+            }
+        }
+    }
+
+    /** Lädt Verbindungen vor der ersten angezeigten und setzt sie oben an die Liste. */
+    fun loadEarlier() {
+        val s = _state.value
+        val ref = s.earlierRef ?: return
+        val fromStation = s.from ?: return
+        val toStation = s.to ?: return
+        val from = fromStation.id ?: return
+        val to = toStation.id ?: return
+        if (s.loadingEarlier) return
+        _state.update { it.copy(loadingEarlier = true) }
+        viewModelScope.launch {
+            try {
+                val page = withContext(Dispatchers.IO) { api.searchJourneys(fromStation, toStation, null, ref) }
+                withContext(Dispatchers.IO) { runCatching { journeyCache.append(from, to, page.journeys) } }
+                _state.update {
+                    it.copy(
+                        loadingEarlier = false,
+                        journeys = (page.journeys + it.journeys).distinct(),
+                        earlierRef = page.earlierRef,
+                        message = if (page.journeys.isEmpty()) "Keine früheren Verbindungen." else it.message,
+                    )
                 }
             } catch (e: Exception) {
                 fail(e)

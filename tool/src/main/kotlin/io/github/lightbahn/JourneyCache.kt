@@ -49,7 +49,12 @@ internal class JourneyCache(filesDir: File) {
         val i = all.indexOfFirst { it.fromId == fromId && it.toId == toId }
         if (i < 0 || journeys.isEmpty()) return
         val updated = all.toMutableList()
-        updated[i] = all[i].copy(journeys = (all[i].journeys + journeys).distinct())
+        // Nach Abfahrt sortiert, damit auch "frühere Verbindungen" an der richtigen Stelle landen.
+        updated[i] = all[i].copy(
+            journeys = (all[i].journeys + journeys).distinct()
+                .sortedBy { j -> j.legs.firstOrNull()?.let { it.plannedDeparture ?: it.departure }?.let { d ->
+                    runCatching { OffsetDateTime.parse(d).toInstant() }.getOrNull() } },
+        )
         write(SavedSearches(updated))
     }
 

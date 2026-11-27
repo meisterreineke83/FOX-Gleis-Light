@@ -305,6 +305,16 @@ class BahnScreen(sealedActivity: SealedLightActivity) :
                 maxLines = 2,
                 modifier = Modifier.padding(bottom = 1f.gridUnitsAsDp()),
             )
+            if (state.earlierRef != null) {
+                LightText(
+                    text = if (state.loadingEarlier) "Lade …" else "Frühere Verbindungen",
+                    variant = LightTextVariant.Copy,
+                    underline = true,
+                    modifier = Modifier
+                        .padding(bottom = 1f.gridUnitsAsDp())
+                        .lightClickable { viewModel.loadEarlier() },
+                )
+            }
             val first = state.journeys.firstOrNull()?.firstDeparture()?.departure
             var lastDay = formatDay(first)
             state.journeys.forEach { journey ->

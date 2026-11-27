@@ -84,6 +84,7 @@ data class Journey(
 data class JourneyPage(
     val journeys: List<Journey>,
     val laterRef: String?,
+    val earlierRef: String? = null,
 )
 
 // ---------------------------------------------------------------- Transitous-Antworten
@@ -153,6 +154,7 @@ internal data class MotisItinerary(
 internal data class MotisPlan(
     val itineraries: List<MotisItinerary> = emptyList(),
     val nextPageCursor: String? = null,
+    val previousPageCursor: String? = null,
 )
 
 // ---------------------------------------------------------------- Client
@@ -213,7 +215,7 @@ internal class BahnApi {
 
     /**
      * @param departure Abfahrtszeit, null = jetzt
-     * @param laterRef  Fortsetzungs-Token für "spätere Verbindungen"
+     * @param laterRef  Fortsetzungs-Token für "spätere" bzw. "frühere Verbindungen"
      */
     suspend fun searchJourneys(
         from: Station,
@@ -243,6 +245,7 @@ internal class BahnApi {
                 Journey(itinerary.legs.map { it.toLeg(from.name, to.name) })
             },
             laterRef = page.nextPageCursor,
+            earlierRef = page.previousPageCursor,
         )
     }
 
