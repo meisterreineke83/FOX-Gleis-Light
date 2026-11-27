@@ -1,0 +1,18 @@
+name: API-Test (temporär)
+on:
+  push:
+    branches: [api-test]
+jobs:
+  t:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          note() { echo "::notice title=$1::$(echo "$2" | head -c 2000 | tr '\n' ' ')"; }
+          P=https://api.transitous.org/api/v5/plan
+          q() { curl -sS -G -A "FOX-Gleis-Light test" $P --data-urlencode "fromPlace=de-DELFI_de:08212:90" --data-urlencode "toPlace=de-DELFI_de:08311:6508" --data-urlencode numItineraries=4 "$@"; }
+          q --data-urlencode "time=2026-11-28T12:00:00+01:00" > a.json
+          note first "$(jq -c '[.itineraries[] | .startTime] , {prev: (.previousPageCursor|length), next: (.nextPageCursor|length)}' a.json)"
+          q --data-urlencode "pageCursor=$(jq -r .previousPageCursor a.json)" > b.json
+          note earlier "$(jq -c '[.itineraries[] | .startTime], {prev: (.previousPageCursor|length)}' b.json)"
+          q --data-urlencode "pageCursor=$(jq -r .previousPageCursor b.json)" > c.json
+          note earlier2 "$(jq -c '[.itineraries[] | .startTime]' c.json)"
